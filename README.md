@@ -25,7 +25,6 @@ The system intelligently detects and tracks people in the frame using YOLO and d
 * YOLO
 * OpenCV
 * Flask
-* Pandas
 * NumPy
 
 ---
