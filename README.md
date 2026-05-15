@@ -15,7 +15,7 @@ The system intelligently detects and tracks people in the frame using YOLO and d
 * Multi-person handling logic
 * Real-time frame processing
 * Flask backend integration
-* Optimized for short-form content creation
+
 
 ---
 
@@ -62,9 +62,7 @@ Example use cases:
 Smart-Vertical-Video-Generator/
 │
 ├── app.py
-├── requirements.txt
-├── static/
-├── templates/
+├── index.html
 ├── uploads/
 ├── outputs/
 └── README.md
@@ -76,8 +74,6 @@ Smart-Vertical-Video-Generator/
 
 * Face priority tracking
 * Object-aware reframing
-* GPU optimization
-* Real-time live video support
 * Audio-based speaker focus
 * Better multi-person scene handling
 
