@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI AUTO REFRAME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --bg:#060606;
+  --panel:#101010;
+  --border:#252525;
+  --accent:#e8ff47;
+  --accent2:#ff4d6d;
+  --text:#f5f5f5;
+  --muted:#666;
+  --mono:'Space Mono', monospace;
+  --display:'Bebas Neue', sans-serif;
+}
+
+html,body{width:100%;min-height:100%;background:var(--bg);color:var(--text);overflow-x:hidden;font-family:var(--mono);}
+
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity:.03;pointer-events:none;z-index:999;
+}
+
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:60px 60px;pointer-events:none;z-index:0;
+}
+
+.shell{
+  position:relative;z-index:1;
+  width:100%;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
+  padding:48px 20px 80px;
+}
+
+/* HEADER */
+header{text-align:center;margin-bottom:80px;}
+
+.logo-tag{
+  display:inline-block;border:1px solid var(--accent);
+  padding:5px 16px;color:var(--accent);
+  font-size:11px;letter-spacing:.25em;text-transform:uppercase;margin-bottom:20px;
+}
+
+h1{font-family:var(--display);font-size:clamp(58px,10vw,120px);line-height:.9;letter-spacing:.05em;}
+h1 span{color:var(--accent);}
+
+.sub{
+  max-width:720px;margin-inline:auto;margin-top:18px;
+  font-size:11px;line-height:1.9;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+}
+
+/* DROP ZONE — FIX: removed clip-path which was hiding overflow video */
+.drop-zone{
+  position:relative;
+  width:100%;max-width:760px;
+  aspect-ratio:16/9;
+  background:rgba(16,16,16,.82);
+  border:2px dashed var(--border);
+  overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  cursor:pointer;
+  transition:border-color .25s,transform .25s,background .25s;
+  backdrop-filter:blur(14px);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03),0 20px 80px rgba(0,0,0,.45);
+}
+
+.drop-zone:hover{transform:translateY(-3px);}
+.drop-zone.drag-over{border-color:var(--accent);background:#131f00;}
+.drop-zone.has-file{border-style:solid;border-color:rgba(232,255,71,.35);}
+
+/* FIX: radial bg only on empty state */
+.drop-zone:not(.has-file)::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at center,rgba(232,255,71,.06),transparent 70%);
+  pointer-events:none;z-index:0;
+}
+
+/* Scan line only when NO file loaded */
+.drop-zone:not(.has-file)::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to bottom,transparent,rgba(232,255,71,.08),transparent);
+  transform:translateY(-100%);
+  animation:scan 4s linear infinite;
+  pointer-events:none;z-index:0;
+}
+
+@keyframes scan{to{transform:translateY(100%);}}
+
+/* FIX: drop icon and text hidden when video is present */
+.drop-icon{
+  width:72px;height:72px;
+  stroke:var(--accent);stroke-width:1.5;fill:none;
+  transition:transform .3s;
+  position:relative;z-index:1;
+}
+.drop-zone:hover .drop-icon{transform:translateY(-5px);}
+.drop-zone.has-file .drop-icon{display:none;}
+
+.drop-title{
+  font-family:var(--display);font-size:34px;letter-spacing:.08em;
+  position:relative;z-index:1;
+}
+.drop-zone.has-file .drop-title{display:none;}
+
+.drop-hint{
+  color:var(--muted);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  position:relative;z-index:1;
+}
+.drop-zone.has-file .drop-hint{display:none;}
+
+#file-input{display:none;}
+
+/* ---- VIDEO PREVIEW (input file) — FIX: z-index above everything ---- */
+#preview-thumb{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  opacity:0;
+  transition:opacity .4s;
+  z-index:4;        /* above all pseudo-elements and overlay base */
+  display:block;
+  pointer-events:none;
+}
+#preview-thumb.visible{opacity:1;}
+
+/* FIX: overlay sits ABOVE the video so filename shows */
+.drop-overlay{
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  background:linear-gradient(transparent, rgba(0,0,0,.72));
+  padding:20px 20px 16px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  opacity:0;
+  transition:opacity .3s;
+  z-index:5;
+  pointer-events:none;
+}
+.has-file .drop-overlay{opacity:1;}
+
+.fname{color:var(--accent);font-size:13px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fmeta{color:rgba(255,255,255,.55);font-size:11px;letter-spacing:.08em;}
+
+/* BUTTONS */
+.cta-row{margin-top:30px;display:flex;align-items:center;gap:16px;}
+
+@keyframes pulseGlow{
+  0%{box-shadow:0 0 0 rgba(232,255,71,0);}
+  50%{box-shadow:0 0 24px rgba(232,255,71,.18);}
+  100%{box-shadow:0 0 0 rgba(232,255,71,0);}
+}
+
+.btn-reframe{
+  border:none;cursor:pointer;
+  padding:18px 52px;
+  background:var(--accent);color:#000;
+  font-family:var(--display);font-size:22px;letter-spacing:.12em;
+  transition:transform .15s,background .2s;
+  animation:pulseGlow 3s infinite;
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));
+}
+.btn-reframe:hover{background:#f3ff7a;transform:translateY(-2px);}
+.btn-reframe:disabled{background:#333;color:#666;cursor:not-allowed;transform:none;animation:none;}
+
+.btn-reset{
+  background:none;border:1px solid var(--border);
+  padding:13px 24px;cursor:pointer;color:var(--muted);
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  transition:border-color .2s,color .2s;
+}
+.btn-reset:hover{color:var(--accent2);border-color:var(--accent2);}
+
+/* PANELS */
+#progress-panel,#result-panel,#error-panel{
+  width:100%;max-width:760px;
+  margin-top:30px;
+  background:rgba(15,15,15,.82);
+  backdrop-filter:blur(14px);
+  border:1px solid var(--border);
+  display:none;
+}
+#progress-panel.active,#result-panel.active,#error-panel.active{
+  display:block;animation:fadeIn .4s ease;
+}
+
+@keyframes fadeIn{
+  from{opacity:0;transform:translateY(10px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
+/* PROGRESS */
+#progress-panel{padding:30px 34px;}
+
+.prog-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;}
+.prog-label{color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase;}
+.prog-pct{font-family:var(--display);font-size:42px;color:var(--accent);}
+
+.prog-bar-bg{height:3px;overflow:hidden;background:var(--border);}
+.prog-bar-fill{
+  position:relative;width:0%;height:100%;
+  background:linear-gradient(90deg,var(--accent),#b7ff00);
+  transition:width .9s cubic-bezier(.22,.61,.36,1);
+}
+.prog-bar-fill::after{
+  content:'';position:absolute;right:0;top:-3px;
+  width:8px;height:9px;background:var(--accent);box-shadow:0 0 14px var(--accent);
+}
+
+.prog-msg{margin-top:15px;color:var(--muted);font-size:11px;letter-spacing:.08em;}
+
+.stages{display:flex;gap:8px;margin-top:26px;}
+.stage{flex:1;height:2px;background:var(--border);transition:background .3s;}
+.stage.done{background:var(--accent);}
+.stage.active{background:linear-gradient(90deg,var(--accent),var(--border));}
+
+/* RESULT */
+#result-panel{
+  padding:34px;text-align:center;
+  background:#0d1400;
+  border:1px solid rgba(232,255,71,.22);
+}
+
+.result-icon{font-size:46px;margin-bottom:12px;}
+.result-title{font-family:var(--display);font-size:38px;letter-spacing:.08em;color:var(--accent);}
+.result-meta{margin-top:10px;margin-bottom:26px;color:var(--muted);font-size:11px;letter-spacing:.12em;}
+
+/* ---- OUTPUT VIDEO — FIX: proper sizing + visible display ---- */
+#output-preview{
+  width:100%;
+  max-width:340px;
+  aspect-ratio:9/16;
+  object-fit:contain;
+  border-radius:12px;
+  background:#000;
+  border:1px solid rgba(255,255,255,.1);
+  margin:0 auto 26px;
+  display:none;
+}
+#output-preview.active{display:block;}
+
+.btn-download{
+  display:inline-block;text-decoration:none;
+  padding:16px 42px;background:var(--accent);color:#000;
+  font-family:var(--display);font-size:20px;letter-spacing:.1em;
+  transition:background .2s,transform .15s;
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));
+}
+.btn-download:hover{background:#f4ff7c;transform:translateY(-2px);}
+
+/* ERROR */
+#error-panel{padding:26px 32px;background:#170007;border:1px solid rgba(255,77,109,.3);}
+.err-title{font-family:var(--display);font-size:24px;color:var(--accent2);letter-spacing:.08em;margin-bottom:8px;}
+#error-msg{color:#ff9aac;font-size:12px;}
+
+/* SPECS */
+.specs{
+  width:100%;max-width:760px;margin-top:46px;
+  display:flex;border:1px solid var(--border);overflow:hidden;
+}
+.spec{flex:1;padding:22px 24px;border-right:1px solid var(--border);background:rgba(15,15,15,.72);}
+.spec:last-child{border-right:none;}
+.spec-val{font-family:var(--display);font-size:30px;color:var(--accent);}
+.spec-key{margin-top:4px;color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;}
+
+/* TICKER */
+.ticker-wrap{
+  width:100%;margin-top:60px;overflow:hidden;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  background:var(--panel);
+}
+.ticker{display:flex;white-space:nowrap;animation:ticker 18s linear infinite;}
+.ticker-item{padding:12px 32px;color:var(--muted);font-size:11px;letter-spacing:.2em;text-transform:uppercase;}
+.ticker-item span{color:var(--accent);margin-right:8px;}
+@keyframes ticker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+/* MOBILE */
+@media(max-width:768px){
+  .shell{padding-inline:16px;}
+  .drop-title{font-size:28px;}
+  .cta-row{width:100%;flex-direction:column;}
+  .btn-reframe,.btn-reset{width:100%;}
+  .specs{flex-direction:column;}
+  .spec{border-right:none;border-bottom:1px solid var(--border);}
+  .spec:last-child{border-bottom:none;}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header>
+    <div class="logo-tag">Powered by YOLOv8</div>
+    <h1>AI AUTO<br><span>REFRAME</span></h1>
+    <p class="sub">Drop any video &rarr; Get a perfect 9:16 cinematic vertical cut with smart AI person tracking and smooth motion reframing</p>
+  </header>
+
+  <div class="drop-zone" id="drop-zone">
+    <svg class="drop-icon" viewBox="0 0 64 64">
+      <rect x="8" y="12" width="48" height="40" rx="3"/>
+      <circle cx="24" cy="26" r="4"/>
+      <polyline points="8,40 20,28 30,38 40,30 56,44"/>
+      <line x1="32" y1="52" x2="32" y2="64"/>
+      <polyline points="24,58 32,52 40,58"/>
+    </svg>
+    <div class="drop-title">DROP YOUR VIDEO</div>
+    <div class="drop-hint">MP4 &bull; MOV &bull; AVI &bull; MKV</div>
+    <input type="file" id="file-input" accept="video/*">
+
+    <!-- FIX: input preview — z-index:4, above pseudo-elements -->
+    <video id="preview-thumb" muted autoplay loop playsinline preload="auto"></video>
+
+    <!-- FIX: overlay is bottom-gradient bar, z-index:5 -->
+    <div class="drop-overlay">
+      <div class="fname" id="fname">No file</div>
+      <div class="fmeta" id="fmeta">Waiting...</div>
+    </div>
+  </div>
+
+  <div class="cta-row">
+    <button class="btn-reframe" id="btn-reframe" disabled>REFRAME IT</button>
+    <button class="btn-reset" id="btn-reset">Clear</button>
+  </div>
+
+  <div id="progress-panel">
+    <div class="prog-header">
+      <span class="prog-label">Processing</span>
+      <span class="prog-pct" id="prog-pct">0%</span>
+    </div>
+    <div class="prog-bar-bg">
+      <div class="prog-bar-fill" id="prog-bar"></div>
+    </div>
+    <div class="prog-msg" id="prog-msg">Initializing...</div>
+    <div class="stages">
+      <div class="stage" id="s1"></div>
+      <div class="stage" id="s2"></div>
+      <div class="stage" id="s3"></div>
+      <div class="stage" id="s4"></div>
+      <div class="stage" id="s5"></div>
+    </div>
+  </div>
+
+  <div id="result-panel">
+    <div class="result-icon">&#9989;</div>
+    <div class="result-title">REFRAME COMPLETE</div>
+    <div class="result-meta" id="result-meta">Saved to outputs folder</div>
+
+    <!-- FIX: output preview — no autoplay attr; JS handles it after canplay fires -->
+    <video
+  id="output-preview"
+  controls
+  muted
+  playsinline
+  preload="metadata">
+</video>
+
+    <a id="btn-download" class="btn-download" href="#" download>DOWNLOAD VIDEO</a>
+  </div>
+
+  <div id="error-panel">
+    <div class="err-title">ERROR</div>
+    <div id="error-msg">Something went wrong.</div>
+  </div>
+
+  <div class="specs">
+    <div class="spec"><div class="spec-val">9:16</div><div class="spec-key">Output Ratio</div></div>
+    <div class="spec"><div class="spec-val">1080P</div><div class="spec-key">Resolution</div></div>
+    <div class="spec"><div class="spec-val">YOLOv8</div><div class="spec-key">Detection</div></div>
+    <div class="spec"><div class="spec-val">2-IN-1</div><div class="spec-key">Person Modes</div></div>
+  </div>
+
+</div>
+
+<div class="ticker-wrap">
+  <div class="ticker">
+    <span class="ticker-item"><span>&bull;</span> Smart Person Tracking</span>
+    <span class="ticker-item"><span>&bull;</span> Cinematic Motion Smoothing</span>
+    <span class="ticker-item"><span>&bull;</span> Blur Background Fill</span>
+    <span class="ticker-item"><span>&bull;</span> Dual Person Mode</span>
+    <span class="ticker-item"><span>&bull;</span> Audio Preserved</span>
+    <span class="ticker-item"><span>&bull;</span> Neural AI Reframing</span>
+    <span class="ticker-item"><span>&bull;</span> Smart Person Tracking</span>
+    <span class="ticker-item"><span>&bull;</span> Cinematic Motion Smoothing</span>
+    <span class="ticker-item"><span>&bull;</span> Blur Background Fill</span>
+    <span class="ticker-item"><span>&bull;</span> Dual Person Mode</span>
+    <span class="ticker-item"><span>&bull;</span> Audio Preserved</span>
+    <span class="ticker-item"><span>&bull;</span> Neural AI Reframing</span>
+  </div>
+</div>
+
+<script>
+const SERVER = "http://localhost:5000";
+
+const dropZone      = document.getElementById("drop-zone");
+const fileInput     = document.getElementById("file-input");
+const btnReframe    = document.getElementById("btn-reframe");
+const btnReset      = document.getElementById("btn-reset");
+const previewThumb  = document.getElementById("preview-thumb");
+const fnameEl       = document.getElementById("fname");
+const fmetaEl       = document.getElementById("fmeta");
+const progressPanel = document.getElementById("progress-panel");
+const resultPanel   = document.getElementById("result-panel");
+const errorPanel    = document.getElementById("error-panel");
+const progPct       = document.getElementById("prog-pct");
+const progBar       = document.getElementById("prog-bar");
+const progMsg       = document.getElementById("prog-msg");
+const resultMeta    = document.getElementById("result-meta");
+const btnDownload   = document.getElementById("btn-download");
+const errorMsg      = document.getElementById("error-msg");
+const outputPreview = document.getElementById("output-preview");
+
+let selectedFile     = null;
+let pollTimer        = null;
+let previewObjectURL = null;
+
+const STAGES = [
+  {id:"s1",at:5},{id:"s2",at:15},{id:"s3",at:40},{id:"s4",at:75},{id:"s5",at:90}
+];
+
+function updateStages(pct){
+  STAGES.forEach(s => {
+    const el = document.getElementById(s.id);
+    if(pct >= s.at + 10)  el.className = "stage done";
+    else if(pct >= s.at)  el.className = "stage active";
+    else                   el.className = "stage";
+  });
+}
+function hide(arr){ arr.forEach(el => el.classList.remove("active")); }
+function show(el){  el.classList.add("active"); }
+
+/* ---- drag & drop ---- */
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  const file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith("video/")) setFile(file);
+});
+
+// FIX: only click to open file picker when no file loaded (prevent re-trigger when clicking video)
+dropZone.addEventListener("click", e => {
+  if(!selectedFile) fileInput.click();
+});
+fileInput.addEventListener("change", () => { if(fileInput.files[0]) setFile(fileInput.files[0]); });
+
+/* ---- FIX: set file & show inline preview ---- */
+function setFile(file){
+  selectedFile = file;
+
+  // Revoke old object URL
+  if(previewObjectURL){ URL.revokeObjectURL(previewObjectURL); previewObjectURL = null; }
+  previewObjectURL = URL.createObjectURL(file);
+
+  dropZone.classList.add("has-file");
+
+  fnameEl.textContent = file.name.length > 42 ? file.name.slice(0,39)+"..." : file.name;
+  fmetaEl.textContent = `${(file.size/1024/1024).toFixed(1)} MB \u2022 ${(file.type.split("/")[1]||"video").toUpperCase()}`;
+
+  // FIX: fully reset before assigning new src
+  previewThumb.pause();
+  previewThumb.removeAttribute("src");
+  previewThumb.load();
+
+  previewThumb.src = previewObjectURL;
+
+  // FIX: use canplay event — more reliable than loadeddata for autoplay
+  previewThumb.oncanplay = () => {
+    previewThumb.classList.add("visible");
+    previewThumb.play().catch(() => {});
+  };
+  previewThumb.load();
+
+  btnReframe.disabled = false;
+  hide([resultPanel, errorPanel, progressPanel]);
+}
+
+/* ---- reset ---- */
+btnReset.addEventListener("click", () => {
+  selectedFile = null;
+  fileInput.value = "";
+
+  previewThumb.pause();
+  previewThumb.oncanplay = null;
+  previewThumb.removeAttribute("src");
+  previewThumb.load();
+  previewThumb.classList.remove("visible");
+  if(previewObjectURL){ URL.revokeObjectURL(previewObjectURL); previewObjectURL = null; }
+
+  dropZone.classList.remove("has-file");
+  fnameEl.textContent = "No file";
+  fmetaEl.textContent = "Waiting...";
+
+  btnReframe.disabled = true;
+  clearInterval(pollTimer);
+
+  // FIX: properly reset output video
+  outputPreview.pause();
+  outputPreview.oncanplay = null;
+  outputPreview.removeAttribute("src");
+  outputPreview.load();
+  outputPreview.classList.remove("active");
+
+  hide([progressPanel, resultPanel, errorPanel]);
+});
+
+/* ---- reframe ---- */
+btnReframe.addEventListener("click", async () => {
+  if(!selectedFile) return;
+
+  btnReframe.disabled = true;
+  hide([resultPanel, errorPanel]);
+  show(progressPanel);
+  setProgress(2, "Uploading video...");
+
+  const form = new FormData();
+  form.append("video", selectedFile);
+
+  try {
+    const res  = await fetch(`${SERVER}/upload`, {method:"POST", body:form});
+    const data = await res.json();
+    if(!data.job_id) throw new Error(data.error || "Upload failed");
+    setProgress(8, "Processing started...");
+    pollStatus(data.job_id);
+  } catch(err) {
+    showError(err.message);
+  }
+});
+
+/* ---- polling ---- */
+function pollStatus(job_id){
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const res  = await fetch(`${SERVER}/status/${job_id}`);
+      const data = await res.json();
+      setProgress(data.progress, data.message);
+      if(data.status === "done"){  clearInterval(pollTimer); showResult(data.output); }
+      if(data.status === "error"){ clearInterval(pollTimer); showError(data.message); }
+    } catch(err) {
+      clearInterval(pollTimer);
+      showError("Lost connection to server.");
+    }
+  }, 800);
+}
+
+function setProgress(pct, msg){
+  progPct.textContent = `${pct}%`;
+  progBar.style.width = `${pct}%`;
+  progMsg.textContent = msg;
+  updateStages(pct);
+}
+
+/* ---- FIX: show result with reliable video load ---- */
+function showResult(filename){
+  hide([progressPanel, errorPanel]);
+  show(resultPanel);
+
+  resultMeta.textContent = `outputs/${filename}`;
+
+  const videoUrl = `${SERVER}/download/${filename}`;
+  btnDownload.href     = videoUrl;
+  btnDownload.download = filename;
+
+  // FIX: fully reset output video element before loading new src
+  outputPreview.pause();
+  outputPreview.oncanplay = null;
+  outputPreview.removeAttribute("src");
+  outputPreview.load();
+
+  // Small delay lets browser flush the old resource
+  setTimeout(() => {
+    outputPreview.src = videoUrl;
+
+    // FIX: canplay fires as soon as first frames are ready — much more reliable
+    outputPreview.oncanplay = () => {
+      outputPreview.classList.add("active");
+      outputPreview.play().catch(() => {
+        // Autoplay blocked — video still visible with controls
+        outputPreview.classList.add("active");
+      });
+    };
+
+    // FIX: fallback — show video even if canplay never fires (server quirk)
+    outputPreview.onerror = () => {
+      outputPreview.classList.add("active");
+    };
+
+    outputPreview.load();
+  }, 150);
+
+  btnReframe.disabled = false;
+}
+
+function showError(msg){
+  hide([progressPanel, resultPanel]);
+  show(errorPanel);
+  errorMsg.textContent = msg;
+  btnReframe.disabled = false;
+}
+</script>
+</body>
+</html>
